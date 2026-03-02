@@ -6,7 +6,7 @@
 [![PHP Version](https://img.shields.io/packagist/php-v/devravik/extended-resources.svg?style=flat-square)](https://packagist.org/packages/devravik/extended-resources)
 [![License](https://img.shields.io/packagist/l/devravik/extended-resources.svg?style=flat-square)](https://packagist.org/packages/devravik/extended-resources)
 
-DevRavik Extended Resources is a small but powerful extension around Laravel API resources that lets you:
+Extended Resources is a small but powerful extension around Laravel API resources that lets you:
 
 - Define **multiple named formats** for the same resource using PHP 8 attributes.
 - Apply **on-the-fly modifications** to the serialized data (array merges, closures, invokable objects).
