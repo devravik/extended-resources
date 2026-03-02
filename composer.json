@@ -1,0 +1,56 @@
+{
+    "name": "devravik/extended-resources",
+    "description": "Extended utilities for Laravel API resources, including flexible formatting and response enhancements.",
+    "type": "library",
+    "minimum-stability": "stable",
+    "license": "MIT",
+    "version": "1.0.1",
+    "authors": [
+        {
+            "name": "Ravi K. Gupta",
+            "email": "dev.ravikgupta@gmail.com",
+            "role": "Developer"
+        }
+    ],
+    "homepage": "https://github.com/devravik/extended-resources",
+    "keywords": [
+        "laravel",
+        "laravel-api",
+        "laravel-resource",
+        "api-resource",
+        "json-resource",
+        "extended-resources",
+        "formatting",
+        "response",
+        "transformer",
+        "devravik"
+    ],
+    "autoload": {
+        "psr-4": {
+            "Devravik\\ExtendedResources\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Devravik\\ExtendedResources\\Tests\\": "tests/"
+        }
+    },
+    "require": {
+        "php": "^8.1||^8.2||^8.3||^8.4",
+        "laravel/framework": "^10.0|^11.0|^12.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^8.0|^9.0|^10.0",
+        "phpunit/phpunit": "^10.0|^11.5",
+        "laravel/pint": "1.19"
+    },
+    "scripts": {
+        "check-code": [
+            "@lint",
+            "@test"
+        ],
+        "lint": "@php vendor/bin/pint --test",
+        "lint:fix": "@php vendor/bin/pint",
+        "test": "@php vendor/bin/phpunit"
+    }
+}
