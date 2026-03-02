@@ -1,22 +1,54 @@
-## DevRavik Extended Resources
+## Laravel Extended Resources
 
-DevRavik Extended Resources adds a light abstraction on top of Laravel API resources so you can describe multiple shapes for the same resource, modify payloads fluently, and add small response behaviors like status code overrides.
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/devravik/extended-resources.svg?style=flat-square)](https://packagist.org/packages/devravik/extended-resources)
+[![Total Downloads](https://img.shields.io/packagist/dt/devravik/extended-resources.svg?style=flat-square)](https://packagist.org/packages/devravik/extended-resources)
+[![Tests](https://img.shields.io/github/actions/workflow/status/devravik/extended-resources/tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/devravik/extended-resources/actions/workflows/tests.yml)
+[![PHP Version](https://img.shields.io/packagist/php-v/devravik/extended-resources.svg?style=flat-square)](https://packagist.org/packages/devravik/extended-resources)
+[![License](https://img.shields.io/packagist/l/devravik/extended-resources.svg?style=flat-square)](https://packagist.org/packages/devravik/extended-resources)
+
+DevRavik Extended Resources is a small but powerful extension around Laravel API resources that lets you:
+
+- Define **multiple named formats** for the same resource using PHP 8 attributes.
+- Apply **on-the-fly modifications** to the serialized data (array merges, closures, invokable objects).
+- Use **convenience enhancements** like `only()` and `except()` without building custom transformers.
+- Adjust the **HTTP status code** directly from the resource.
+
+It is designed to feel native to Laravel while giving you more control over how resources are shaped and delivered.
+
+---
+
+## Requirements
+
+| Dependency | Version |
+|-----------|---------|
+| PHP       | `^8.1 \| ^8.2 \| ^8.3 \| ^8.4` |
+| Laravel   | `^10.0 \| ^11.0 \| ^12.0`      |
+
+---
 
 ## Installation
+
+Install via Composer:
 
 ```bash
 composer require devravik/extended-resources
 ```
 
-## Basic Usage
+There is no configuration or service provider registration required; the package is auto-discovered by Laravel.
 
-Start by extending `Devravik\ExtendedResources\ExtendedResource` rather than `Illuminate\Http\Resources\Json\JsonResource`. Each resource exposes one or more `#[Format]` methods that describe how the final array should look.
+---
+
+## Core Concepts
+
+### 1. Defining Formats with Attributes
+
+Extend `Devravik\ExtendedResources\ExtendedResource` instead of `Illuminate\Http\Resources\Json\JsonResource`, and define one or more `#[Format]` methods:
 
 ```php
 <?php
 
-use Devravik\ExtendedResources\Formatting\Attributes\Format;
 use Devravik\ExtendedResources\ExtendedResource;
+use Devravik\ExtendedResources\Formatting\Attributes\Format;
 
 class ProductResource extends ExtendedResource
 {
@@ -24,25 +56,21 @@ class ProductResource extends ExtendedResource
     public function summary(): array
     {
         return [
-            'sku' => $this->resource->sku,
-            'name' => $this->resource->name,
+            'sku'   => $this->resource->sku,
+            'name'  => $this->resource->name,
             'price' => $this->resource->price,
         ];
     }
 }
 ```
 
-## Formatting
+If a resource defines only a single `#[Format]` method, that format is considered the default.
 
-With Extended Resources you can attach multiple formats to the same resource by adding additional formatted methods. Each `#[Format]` method becomes a named format.
-
-If only one format is declared it is treated as the default. Once you add multiple formats, you can still opt into one of them as the default, or always choose explicitly at call time.
+#### Multiple Formats
 
 ```php
-<?php
-
-use Devravik\ExtendedResources\Formatting\Attributes\Format;
 use Devravik\ExtendedResources\ExtendedResource;
+use Devravik\ExtendedResources\Formatting\Attributes\Format;
 
 class ProductResource extends ExtendedResource
 {
@@ -50,7 +78,7 @@ class ProductResource extends ExtendedResource
     public function summary(): array
     {
         return [
-            'sku' => $this->resource->sku,
+            'sku'  => $this->resource->sku,
             'name' => $this->resource->name,
         ];
     }
@@ -59,257 +87,233 @@ class ProductResource extends ExtendedResource
     public function pricing(): array
     {
         return [
-            'sku' => $this->resource->sku,
-            'price' => $this->resource->price,
+            'sku'      => $this->resource->sku,
+            'price'    => $this->resource->price,
             'currency' => $this->resource->currency,
         ];
     }
-
-    #[Format]
-    public function inventory(): array
-    {
-        return [
-            'sku' => $this->resource->sku,
-            'warehouse_stock' => $this->resource->stock,
-        ];
-    }
 }
-```
 
-By default the format name mirrors the method name, so the example above exposes the `summary`, `pricing`, and `inventory` formats:
-
-```php
+// Choose a specific format at runtime
 ProductResource::make($product)->format('pricing');
 ```
 
-Failing to specify the format in a situation where there is no default format will result in a `NoFormatSelectedException` being thrown.
+The format name defaults to the method name (`summary`, `pricing`, etc.).
 
-### Specifying a Default
+### 2. Default Formats with `#[IsDefault]`
 
-If you don't want to always explicitly specify the format to be used when you have a resource with multiple formats you can specify one format as default using the `#[IsDefault]` attribute.
+If you have multiple formats and want one to be used when no explicit format is selected, mark it with `#[IsDefault]`:
 
 ```php
-<?php
-
+use Devravik\ExtendedResources\ExtendedResource;
 use Devravik\ExtendedResources\Formatting\Attributes\Format;
 use Devravik\ExtendedResources\Formatting\Attributes\IsDefault;
-use Devravik\ExtendedResources\ExtendedResource;
 
-class ExampleResource extends ExtendedResource
+class UserProfileResource extends ExtendedResource
 {
     #[Format]
-    public function bar(): array
+    public function compact(): array
     {
-        return [];
+        return [
+            'id'   => $this->resource->id,
+            'name' => $this->resource->name,
+        ];
     }
 
     #[IsDefault, Format]
-    public function foo(): array
-    {
-        return [];
-    }
-
-    #[Format]
-    public function foobar(): array
-    {
-        return [];
-    }
-}
-```
-
-After adding the `#[IsDefault]` attribute to one of your format methods it will be used unless the format is explicitly specified via the `format()` method.
-
-Specifying more than one default method via the `#[IsDefault]` attribute will result in a `MultipleDefaultFormatsException` being thrown.
-
-The `#[IsDefault]` attribute is detected on a per-class basis up the inheritance chain, so you can define a format as `#[IsDefault]` on a parent resource and override it with another `#[IsDefault]` format on the child resource without triggering a `MultipleDefaultFormatsException`. However, if no `#[IsDefault]` format is defined on the child resource the one on the parent will still be used.
-
-### Naming Formats
-
-You can also override the name of formats and even provide multiple names for a single format. Let's look at the following example:
-
-```php
-<?php
-
-use Devravik\ExtendedResources\Formatting\Attributes\Format;
-use Devravik\ExtendedResources\Formatting\Attributes\IsDefault;
-use Devravik\ExtendedResources\ExtendedResource;
-
-class ExampleResource extends ExtendedResource
-{
-    #[Format, Format('a')]
-    public function bar(): array
-    {
-        return [];
-    }
-
-    #[Format, Format('b'), Format('something-else')]
-    public function foo(): array
-    {
-        return [];
-    }
-
-    #[Format('c')]
-    public function foobar(): array
-    {
-        return [];
-    }
-}
-```
-
-In this example we have three formats, but six names:
- - The `bar` method can be used with the names `bar`, and `a`.
- - The `foo` method can be used with the names `foo`, `b`, and `something-else`.
- - The `foobar` method can be used with the name `c`.
-
-The primary name of each format is the first instance of the `#[Format]` attribute, and the rest are aliases. This means that the primary names would be: `bar`, `foo`, and `c` in the example above. In most cases this distinction should not come into play.
-
-### Collections
-
-Both anonymous collections and defined resource collections utilize the formats of the underlying resource objects, and follow all the same rules.
-
-## Modifications
-
-Modifications allow you to tweak the output of resources on the fly. They are applied similarly to how `state` is applied for Eloquent factories. The most basic form of modification is a simple array merge modification done by providing an array to the `modify` method of a resource:
-
-```php
-ExampleResource::make($object)->modify(['some_key' => 'some_value']);
-```
-
-To accomplish more complex modifications you can also pass any callable that accepts `(array $data, Resource $resource)`. It is important when using these types of modifications to return the data as failing to do so will result in resource's data being replaced with `null`.
-
-```php
-ExampleResource::make($object)->modify(function (array $data) {
-    $data['some_key'] = 'some_value';
-    
-    return $data;
-})
-```
-
-You can also define methods on the resource class itself that can make modifications via calling the `modify` method.
-
-```php
-<?php
-
-use Devravik\ExtendedResources\Formatting\Attributes\Format;
-use Devravik\ExtendedResources\Formatting\Attributes\IsDefault;
-use Devravik\ExtendedResources\ExtendedResource;
-
-class ExampleResource extends ExtendedResource
-{
-    #[Format]
-    public function foo(): array
+    public function detailed(): array
     {
         return [
-            'value' => $this->resource['value'],
+            'id'      => $this->resource->id,
+            'name'    => $this->resource->name,
+            'email'   => $this->resource->email,
+            'joined'  => $this->resource->created_at,
         ];
     }
-    
-    public function double(): static
-    {
-        return $this->modify(function (array $data) {
-            $data['value'] *= 2;
-            
-            return $data;        
-        });
-    }
 }
-
-ExampleResource::make(['value' => 1])->double()->toArray(); // ['value' => 2]
 ```
 
-### Except
-The except enhancement is a modification class and trait combination that allows for the easy exclusion of certain fields from a resource.
+If no explicit call to `format()` is made, the `detailed` format is used.
+
+### 3. Modifying Resource Output
+
+Every extended resource exposes a `modify()` method that lets you transform the final array:
 
 ```php
-<?php
+// Simple array merge
+ProductResource::make($product)
+    ->modify(['is_featured' => true]);
 
+// Using a closure
+ProductResource::make($product)
+    ->modify(function (array $data) {
+        $data['price_with_tax'] = $data['price'] * 1.2;
+
+        return $data;
+    });
+
+// Using an invokable object
+ProductResource::make($product)
+    ->modify(new class {
+        public function __invoke(array $data): array
+        {
+            $data['label'] = strtoupper($data['name']);
+
+            return $data;
+        }
+    });
+```
+
+Multiple modifications can be chained; they are applied in order.
+
+### 4. Enhancements: `except()` and `only()`
+
+Two small enhancements ship with the package:
+
+- `Except` + `AppliesExceptFilter` trait for excluding keys.
+- `Only` + `AppliesOnlyFilter` trait for whitelisting keys.
+
+```php
 use Devravik\ExtendedResources\Enhancements\Except;
+use Devravik\ExtendedResources\Enhancements\Only;
 use Devravik\ExtendedResources\Enhancements\Traits\AppliesExceptFilter;
-use Devravik\ExtendedResources\Formatting\Attributes\Format;
-use Devravik\ExtendedResources\Formatting\Attributes\IsDefault;
+use Devravik\ExtendedResources\Enhancements\Traits\AppliesOnlyFilter;
 use Devravik\ExtendedResources\ExtendedResource;
+use Devravik\ExtendedResources\Formatting\Attributes\Format;
 
-class ExampleResource extends ExtendedResource
+class CustomerResource extends ExtendedResource
 {
     use AppliesExceptFilter;
-
-    #[Format]
-    public function foo(): array
-    {
-        return [
-            'first_name' => $this->resource->firstName,
-            'id' => $this->resource->id,
-            'last_name' => $this->resource->lastName,
-        ];
-    }
-}
-
-ExampleResource::make(new class {
-    public string $firstName = 'John';
-    public int $id = 1;
-    public string $lastName = 'Doe';
-})->except('id'); // ['first_name' => 'John', 'last_name' => 'Doe']
-
-// Without the trait you can still use the Except enhancement.
-ExampleResource::make(new class {
-    public string $firstName = 'John';
-    public int $id = 1;
-    public string $lastName = 'Doe';
-})->modify(new Except(['id'])); // ['first_name' => 'John', 'last_name' => 'Doe']
-```
-
-### Only
-The only enhancement is a modification class and trait combination that allows for the easy exclusion of certain fields from a resource.
-
-```php
-<?php
-
-use Devravik\ExtendedResources\Enhancements\Only;
-use Devravik\ExtendedResources\Enhancements\Traits\AppliesOnlyFilter;
-use Devravik\ExtendedResources\Formatting\Attributes\Format;
-use Devravik\ExtendedResources\Formatting\Attributes\IsDefault;
-use Devravik\ExtendedResources\ExtendedResource;
-
-class ExampleResource extends ExtendedResource
-{
     use AppliesOnlyFilter;
 
     #[Format]
-    public function foo(): array
+    public function base(): array
     {
         return [
-            'first_name' => $this->resource->firstName,
-            'id' => $this->resource->id,
-            'last_name' => $this->resource->lastName,
+            'id'         => $this->resource->id,
+            'name'       => $this->resource->name,
+            'email'      => $this->resource->email,
+            'created_at' => $this->resource->created_at,
         ];
     }
 }
 
-ExampleResource::make(new class {
-    public string $firstName = 'John';
-    public int $id = 1;
-    public string $lastName = 'Doe';
-})->only('id'); // ['id' => 1]
+// Drop email from the payload
+CustomerResource::make($customer)->except('email');
 
-// Without the trait you can still use the Only enhancement.
-ExampleResource::make(new class {
-    public string $firstName = 'John';
-    public int $id = 1;
-    public string $lastName = 'Doe';
-})->modify(new Only(['id'])); // ['id' => 1]
+// Keep only ID + name
+CustomerResource::make($customer)->only('id', 'name');
+
+// You can also apply the enhancements manually:
+CustomerResource::make($customer)->modify(new Except(['email']));
+CustomerResource::make($customer)->modify(new Only(['id', 'name']));
 ```
 
-## Additional Enhancements
-Extended Resources also includes a couple of other helpful enhancements.
+### 5. Collections
 
-### Status Codes
-You can now tweak the status code of the resource response with a simple call to the `setResponseStatus()` method.
+Extended Resources work with both explicit collections and anonymous collections.
+
+```php
+use Devravik\ExtendedResources\ExtendedResource;
+
+class OrderResource extends ExtendedResource
+{
+    // ...
+}
+
+// Anonymous collection
+return OrderResource::collection($orders);
+```
+
+Under the hood this uses `ExtendedResourceCollection` and `ExtendedAnonymousResourceCollection`, which proxy modification methods like `format()`, `only()`, and `except()` down to each resource in the collection.
+
+### 6. Response Status Codes
+
+All resources and collections use the `SetsResponseStatus` trait, which adds a `setResponseStatus()` helper:
 
 ```php
 use Symfony\Component\HttpFoundation\Response;
 
-ExampleResource::make($object)->setResponseStatus(Response::HTTP_I_AM_A_TEAPOT);
+return ProductResource::make($product)
+    ->setResponseStatus(Response::HTTP_CREATED);
 ```
 
+This leaves your controller methods clean while still letting you adjust the status code where the data is built.
+
+---
+
+## API Overview
+
+### ExtendedResource
+
+Key methods:
+
+- `format(string $name): static` – choose a named format.
+- `modify(callable|array $modification): static` – queue a modification.
+- `setResponseStatus(?int $code): static` – override the response status.
+
+### ExtendedResourceCollection
+
+Behaves similarly to Laravel's `ResourceCollection`, but:
+
+- Ensures `collects` is an `ExtendedResource` subclass.
+- Proxies unknown method calls to the underlying resource class when appropriate (e.g. `format()`, `only()`, etc.).
+
+### Attributes
+
+- `#[Format(?string $name = null)]` – declare a format; optional explicit name.
+- `#[IsDefault]` – mark a format as the default when multiple formats exist.
+
+---
+
 ## Testing
-For HTTP tests you can continue to rely on Laravel's built-in response assertions when your controllers return extended resources.
+
+The package ships with a full PHPUnit test suite. To run it:
+
+```bash
+composer test
+```
+For HTTP tests in your own application, you can continue to rely on Laravel's built‑in response assertions when controllers return extended resources.
+
+---
+
+## Contributing
+
+Contributions are welcome:
+
+1. Fork the repository and create a feature branch from `main`.
+2. Add tests for any new functionality or bug fixes.
+3. Run `composer test` to ensure the suite passes.
+4. Follow PSR-12 / Laravel Pint style guidelines.
+5. Open a pull request with a clear description of the change.
+
+Bug reports should include your PHP and Laravel versions, the package version, minimal reproduction code, and any relevant stack traces.
+
+---
+
+## Security
+
+If you discover a security vulnerability, please **do not** open a public GitHub issue.
+
+Instead, email `dev.ravikgupta@gmail.com` with the subject line:
+
+`[SECURITY] devravik/extended-resources <short description>`
+
+You will receive a response as soon as possible with next steps.
+
+---
+
+## Maintainer
+
+**Ravi K Gupta**
+
+- **Website**: [devravik.github.io](https://devravik.github.io/)
+- **Email**: `dev.ravikgupta@gmail.com`
+- **LinkedIn**: [linkedin.com/in/ravi-k-dev](https://www.linkedin.com/in/ravi-k-dev)
+- **GitHub**: [github.com/devravik](https://github.com/devravik)
+
+---
+
+## License
+
+The MIT License (MIT). See the [LICENSE](LICENSE) file for details.
